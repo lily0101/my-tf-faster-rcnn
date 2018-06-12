@@ -11,6 +11,7 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from tensorflow.contrib.slim import losses
 from tensorflow.contrib.slim import arg_scope
+from tensorflow.python.framework import graph_util
 
 import numpy as np
 
@@ -220,7 +221,9 @@ class Network(object):
       initializer_bbox = tf.random_normal_initializer(mean=0.0, stddev=0.001)
 
     net_conv = self._image_to_head(is_training)
+    print("-----------------------RPN----------------------------")
     with tf.variable_scope(self._scope, self._scope):
+      print(self._scope +'/' + self._scope)
       # build the anchors for the image
       self._anchor_component()
       # region proposal network
@@ -230,13 +233,16 @@ class Network(object):
         pool5 = self._crop_pool_layer(net_conv, rois, "pool5")
       else:
         raise NotImplementedError
-
+    print("-----------------------------RPN--------------------------")
     fc7 = self._head_to_tail(pool5, is_training)
+    print("-----------------------------------------------------------")
     with tf.variable_scope(self._scope, self._scope):
       # region classification
+      print(self._scope + "/" + self._scope)
       cls_prob, bbox_pred = self._region_classification(fc7, is_training, 
-                                                        initializer, initializer_bbox)
 
+                                                        initializer, initializer_bbox)
+    print("--------------------------------------------------------------")
     self._score_summaries.update(self._predictions)
 
     return rois, cls_prob, bbox_pred
@@ -396,7 +402,7 @@ class Network(object):
     with arg_scope([slim.conv2d, slim.conv2d_in_plane, \
                     slim.conv2d_transpose, slim.separable_conv2d, slim.fully_connected], 
                     weights_regularizer=weights_regularizer,
-                    biases_regularizer=biases_regularizer, 
+                    biases_regularizer=biases_regularizer,
                     biases_initializer=tf.constant_initializer(0.0)): 
       rois, cls_prob, bbox_pred = self._build_network(training)
 
@@ -450,12 +456,34 @@ class Network(object):
   def test_image(self, sess, image, im_info):
     feed_dict = {self._image: image,
                  self._im_info: im_info}
-
+    #it's in score
+    print(image.dtype)
     cls_score, cls_prob, bbox_pred, rois = sess.run([self._predictions["cls_score"],
                                                      self._predictions['cls_prob'],
                                                      self._predictions['bbox_pred'],
                                                      self._predictions['rois']],
                                                     feed_dict=feed_dict)
+    output_graph = "./test_pb/test_image.pb"
+    graph_def = tf.get_default_graph().as_graph_def()  #
+    with open('./test_pb/test_node_name.txt', 'wb') as f:
+      for n in graph_def.node:
+        # print("--------------------------------------------------------------------------------------------")
+        # np.savetxt(f, to_string(n),fmt='%.2f')
+        f.write(str(n.name))
+        f.write("\n")
+      # print(n.name)
+      # print("--------------------------------------------------------------------------------------------")
+    f.close()
+    output_graph_def = graph_util.convert_variables_to_constants(  #
+      sess,
+      graph_def,
+      ["cls_prob","bbox_pred"]
+    )
+
+    with tf.gfile.GFile(output_graph, "wb") as f:  #
+      f.write(output_graph_def.SerializeToString())  #
+    print("%d ops in the final graph." % len(output_graph_def.node))
+
     return cls_score, cls_prob, bbox_pred, rois
 
   def get_summary(self, sess, blobs):

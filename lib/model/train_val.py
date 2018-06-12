@@ -52,6 +52,8 @@ class SolverWrapper(object):
     filename = cfg.TRAIN.SNAPSHOT_PREFIX + '_iter_{:d}'.format(iter) + '.ckpt'
     filename = os.path.join(self.output_dir, filename)
     self.saver.save(sess, filename)
+    #Store the model pb
+
     print('Wrote snapshot to: {:s}'.format(filename))
 
     # Also store some meta information, random state, etc.
@@ -146,6 +148,7 @@ class SolverWrapper(object):
 
       # We will handle the snapshots ourselves
       self.saver = tf.train.Saver(max_to_keep=100000)
+
       # Write the train and validation information to tensorboard
       self.writer = tf.summary.FileWriter(self.tbdir, sess.graph)
       self.valwriter = tf.summary.FileWriter(self.tbvaldir)
@@ -316,6 +319,17 @@ class SolverWrapper(object):
 
     if last_snapshot_iter != iter - 1:
       self.snapshot(sess, iter - 1)
+
+    with open('./test_pb/train_node_name.txt', 'wb') as f:
+      for op in tf.get_default_graph().get_operations():  # print the info of node
+        #print(op.name, op.values())
+        # print("--------------------------------------------------------------------------------------------")
+        # np.savetxt(f, to_string(n),fmt='%.2f')
+        f.write(str(op.name + "/" + op.values()))
+        f.write("\n")
+      # print(n.name)
+      # print("--------------------------------------------------------------------------------------------")
+    f.close()
 
     self.writer.close()
     self.valwriter.close()

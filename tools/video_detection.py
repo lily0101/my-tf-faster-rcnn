@@ -1,3 +1,15 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+from imutils.video import VideoStream
+from imutils.video import FPS
+import numpy as np
+import argparse
+import imutils
+import time
+import cv2
+
 #!/usr/bin/env python
 
 # --------------------------------------------------------
@@ -11,10 +23,6 @@ Demo script showing detections in sample images.
 
 See README.md for installation instructions before running.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import _init_paths
 from model.config import cfg
 from model.test import im_detect
@@ -26,6 +34,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os, cv2
 import argparse
+
 
 from nets.vgg16 import vgg16
 from nets.resnet_v1 import resnetv1
@@ -43,6 +52,57 @@ CLASSES = ('__background__',
 
 NETS = {'vgg16': ('vgg16_faster_rcnn_iter_10000.ckpt',),'res101': ('res101_faster_rcnn_iter_110000.ckpt',)}
 DATASETS= {'pascal_voc': ('voc_2007_trainval',),'pascal_voc_0712': ('voc_2007_trainval+voc_2012_trainval',)}
+#VIDEO ={'video': ('/home/chenxingli/dengtaAI/dataset/video/test1.mp4',),('/home/chenxingli/dengtaAI/dataset/video/test1.mp4',)}
+video_path = "/home/chenxingli/dengtaAI/dataset/video/input/ch04_20180321070948_20180502144011_2018050214434H265.mp4"
+
+class LabelWithIOU:
+    def __init__(self):
+        self._record = np.zeros((300000, 4))
+        self._name_idx = 0
+        self._thresh = 0.2
+        self._names = {0: "N2018P676402", 1: "N2018P424150",
+                       2: "N2018P750476", 3: "N2018P431157",
+                       4: "N2018P687413", 5: "N2018P432158",
+                       6: "N2018P482208", 7: "N2018P434160",
+                       8: "N2018P753479", 9: "N2018P795521",
+                       10: "N2018P818544", 11: "N2018P919645",
+                       12: "N2018P810536", 13: "N2018P674400",
+                       14: "N2018P672398"}
+        self._seq_name = {}
+        self._count = 0
+
+    def _iou(self, bb):
+        ixmin = np.maximum(self._record[:, 0], bb[0])
+        iymin = np.maximum(self._record[:, 1], bb[1])
+        ixmax = np.minimum(self._record[:, 2], bb[2])
+        iymax = np.minimum(self._record[:, 3], bb[3])
+        iw = np.maximum(ixmax - ixmin + 1., 0.)
+        ih = np.maximum(iymax - iymin + 1., 0.)
+        inters = iw * ih
+
+        # union
+        uni = ((bb[2] - bb[0] + 1.) * (bb[3] - bb[1] + 1.) +
+               (self._record[:, 2] - self._record[:, 0] + 1.) *
+               (self._record[:, 3] - self._record[:, 1] + 1.) - inters)
+
+        overlaps = inters / uni
+        ovmax = np.max(overlaps)
+        jmax = np.argmax(overlaps)
+        return ovmax, jmax
+
+    def get_name(self, bb):
+        iou, seq = self._iou(bb)
+        # print(iou, idx)
+        if iou > self._thresh:
+            name = self._seq_name[seq]
+        else:
+            name = self._names[self._name_idx % 15]
+            self._name_idx += 1
+        self._record[self._count] = np.array(bb)
+        self._seq_name[self._count] = name
+        self._count += 1
+        print(self._count)
+        return name
 
 def vis_detections(im, class_name, dets, thresh=0.5):
     """Draw detected bounding boxes."""
@@ -55,15 +115,19 @@ def vis_detections(im, class_name, dets, thresh=0.5):
     fig, ax = plt.subplots(figsize=(12, 12))
     ax.imshow(im, aspect='equal')
     #mask = im#.transpose((1, 2, 0)).astype(np.uint8).copy()  #np.zeros_like(im, dtype=np.uint8).copy()
+    label = LabelWithIOU()
+    label.__init__()
 
     for i in inds:
         bbox = dets[i, :4]
         score = dets[i, -1]
         #'''
+
         cv2.rectangle(mask, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 4)
         font = cv2.FONT_HERSHEY_COMPLEX_SMALL
         text = '{:s}\{:.3f}'.format(class_name, score)
-        cv2.putText(mask, text, (int(bbox[0]), int(bbox[1] - 2)), font, 2, (0, 0, 255), 1)
+        cow_name = label.get_name(bbox)
+        cv2.putText(mask, cow_name, (int(bbox[0]), int(bbox[1] - 2)), font, 2, (0, 0, 255), 1)
         #'''
         ax.add_patch(
             plt.Rectangle((bbox[0], bbox[1]),
@@ -85,19 +149,17 @@ def vis_detections(im, class_name, dets, thresh=0.5):
     plt.draw()
     return mask
 
-def demo(sess, net, image_name):
+def demo(sess, net, im):
     """Detect object classes in an image using pre-computed object proposals."""
 
     # Load the demo image
-    im_file = os.path.join(cfg.DATA_DIR, 'demo', image_name)
-    im = cv2.imread(im_file)
+    #im_file = os.path.join(cfg.DATA_DIR, 'demo', image_name)
+    #im = cv2.imread(im_file)
 
     # Detect all object classes and regress object bounds
     timer = Timer()
     timer.tic()
-    #get the scores and boxes of each anchor
     scores, boxes = im_detect(sess, net, im)
-
     timer.toc()
     print('Detection took {:.3f}s for {:d} object proposals'.format(timer.total_time, boxes.shape[0]))
 
@@ -126,7 +188,7 @@ def parse_args():
 
     return args
 
-if __name__ == '__main__':
+def video_detection():
     cfg.TEST.HAS_RPN = True  # Use RPN for proposals
     args = parse_args()
 
@@ -159,23 +221,54 @@ if __name__ == '__main__':
     net.create_architecture("TEST", 2,
                           tag='default', anchor_scales=[8, 16, 32])
     saver = tf.train.Saver()
-    #tf.train.write_graph(sess.graph_def,'',"graph.pb")
     saver.restore(sess, tfmodel)
-
 
     print('Loaded network {:s}'.format(tfmodel))
 
-    im_names = [#"/home/chenxingli/dengtaAI/dataset/testimages/input/443048211133329708.jpg",
-                #"/home/chenxingli/dengtaAI/dataset/testimages/input/119286569232544007.jpg",
-                #"/home/chenxingli/dengtaAI/dataset/testimages/input/721687407986871341.jpg",
-                "/home/chenxingli/dengtaAI/dataset/testimages/input/762700729165898532.jpg"
-                ]
-    for im_name in im_names:
-        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-        print('Demo for data/demo/{}'.format(im_name))
-        im = demo(sess, net, im_name)
-        print("/home/chenxingli/dengtaAI/dataset/testimages/output/"+im_name)
-        cv2.imwrite("/home/chenxingli/dengtaAI/dataset/testimages/output/"+os.path.split(im_name)[1], im)
-    plt.show()
+    #initialize the vedio stream
+    #initialize the FPS counter
+    print("[INFO] starting video stream....")
+    vs = cv2.VideoCapture(video_path)
+    fps = 24
+    if not vs.isOpened():
+        print("Error opening video stream or file")
+        exit(1)
+
+    #output
+    fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+    videoWriter = cv2.VideoWriter("/home/chenxingli/dengtaAI/dataset/video/output/ch04_20180321070948_20180502144011_2018050214434H265.mp4", fourcc,
+                                  fps,(1280,720))  # 1280, 720
+    # loop over the frames from the video stream
+    while True:
+        #grap the frame from the threaded video stream and resize it
+        #to have a maximum width of 400 pixels
+        ret, frame = vs.read()
+        print('shape : ', type(frame))
+        if frame is None:
+            break
+        #frame = imutils.resize(frame, width=400)
+
+        # grab the frame dimensions and convert it to a blob
+        if cv2.waitKey(100) & 0xFF == ord('q'):
+            break
+        print('Demo for data/demo/{}'.format(frame))
+        img = demo(sess, net, frame)
+        img = cv2.resize(img, (1280, 720))
+        videoWriter.write(img)
+
+        cv2.imshow("Frame",img)
+
+
+
+    cv2.destroyAllWindows()
+    videoWriter.release()
+    vs.release()
+
+
+if __name__ == '__main__':
+    video_detection()
+
+
+
 
 

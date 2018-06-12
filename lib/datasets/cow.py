@@ -36,7 +36,6 @@ class pascal_voc(imdb):
     self._classes = ('__background__',  # always index 0
                      '1')
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
-    self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
     self._image_ext = '.jpg'
     self._image_index = self._load_image_set_index()
     # Default to roidb handler
@@ -237,7 +236,7 @@ class pascal_voc(imdb):
     for i, cls in enumerate(self._classes):
       if cls == '__background__':
         continue
-      filename = self._get_voc_results_file_template().format(cls)
+      filename = self._get_voc_results_file_template().format(cls)#it's 1
       rec, prec, ap = voc_eval(
         filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
         use_07_metric=use_07_metric, use_diff=self.config['use_diff'])

@@ -47,7 +47,8 @@ class vgg16(Network):
 
   def _head_to_tail(self, pool5, is_training, reuse=None):
     with tf.variable_scope(self._scope, self._scope, reuse=reuse):
-      pool5_flat = slim.flatten(pool5, scope='flatten')
+
+      pool5_flat = slim.flatten(pool5, scope='flatten') #vgg16_2
       fc6 = slim.fully_connected(pool5_flat, 4096, scope='fc6')
       if is_training:
         fc6 = slim.dropout(fc6, keep_prob=0.5, is_training=True, 

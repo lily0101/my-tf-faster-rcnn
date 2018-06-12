@@ -127,7 +127,7 @@ ext_modules = [
         # we're only going to use certain compiler args with nvcc and not with gcc
         # the implementation of this trick is in customize_compiler() below
         extra_compile_args={'gcc': ["-Wno-unused-function"],
-                            'nvcc': ['-arch=sm_52',
+                            'nvcc': ['-arch=sm_61',
                                      '--ptxas-options=-v',
                                      '-c',
                                      '--compiler-options',
@@ -138,6 +138,7 @@ ext_modules = [
 
 setup(
     name='tf_faster_rcnn',
+    USE_GPU_NMS=False,
     ext_modules=ext_modules,
     # inject our custom trigger
     cmdclass={'build_ext': custom_build_ext},

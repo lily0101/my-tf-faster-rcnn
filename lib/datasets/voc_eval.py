@@ -99,6 +99,11 @@ def voc_eval(detpath,
   # assumes imagesetfile is a text file with each line an image name
   # cachedir caches the annotations in a pickle file
 
+  print("detpath %s"%detpath)
+  print("annotation %s" % annopath)
+  print("imagesetfile %s" % imagesetfile)
+  print("cachedir annotation %s" % cachedir)
+  print("classname is %s"%classname)
   # first load gt
   if not os.path.isdir(cachedir):
     os.mkdir(cachedir)
@@ -107,6 +112,8 @@ def voc_eval(detpath,
   with open(imagesetfile, 'r') as f:
     lines = f.readlines()
   imagenames = [x.strip() for x in lines]
+  print(imagenames)
+
 
   if not os.path.isfile(cachefile):
     # load annotations
@@ -146,13 +153,20 @@ def voc_eval(detpath,
 
   # read dets
   detfile = detpath.format(classname)
+  print("detfile is %s" % detfile)
   with open(detfile, 'r') as f:
     lines = f.readlines()
 
   splitlines = [x.strip().split(' ') for x in lines]
+  print("splitlines is %s" % splitlines)
   image_ids = [x[0] for x in splitlines]
+  print("image_ids is %s"% image_ids)
   confidence = np.array([float(x[1]) for x in splitlines])
-  BB = np.array([[float(z) for z in x[2:]] for x in splitlines])
+  print("confidence is %s"% confidence)
+  try:
+     BB = np.array([[float(z) for z in x[2:]] for x in splitlines])
+  except ValueError, e:
+    print ("error", e, "on line", )
 
   nd = len(image_ids)
   tp = np.zeros(nd)
@@ -161,6 +175,7 @@ def voc_eval(detpath,
   if BB.shape[0] > 0:
     # sort by confidence
     sorted_ind = np.argsort(-confidence)
+    print("sorted_ind is %s"%sorted_ind)
     sorted_scores = np.sort(-confidence)
     BB = BB[sorted_ind, :]
     image_ids = [image_ids[x] for x in sorted_ind]
